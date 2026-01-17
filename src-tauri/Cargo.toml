@@ -1,7 +1,7 @@
 [package]
-name = "tauri-appmarki-mark"
+name = "marki-mark"
 version = "0.1.0"
-description = "A Tauri App"
+description = "Simple Markdown viewer & editor"
 authors = ["you"]
 edition = "2021"
 
