@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from '@tauri-apps/plugin-dialog';
 import { MenuBar } from "./components/MenuBar";
@@ -14,6 +14,7 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   // Load theme from localStorage
   useState(() => {
@@ -30,6 +31,50 @@ function App() {
         document.documentElement.classList.add('dark');
     }
   });
+
+  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 3.0));
+  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
+  const handleZoomReset = () => setZoomLevel(1);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '=' || e.key === '+') {
+          e.preventDefault();
+          setZoomLevel(prev => Math.min(prev + 0.1, 3.0));
+        } else if (e.key === '-') {
+          e.preventDefault();
+          setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
+        } else if (e.key === '0') {
+          e.preventDefault();
+          setZoomLevel(1);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '=' || e.key === '+') {
+          e.preventDefault();
+          setZoomLevel(prev => Math.min(prev + 0.1, 3.0));
+        } else if (e.key === '-') {
+          e.preventDefault();
+          setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
+        } else if (e.key === '0') {
+          e.preventDefault();
+          setZoomLevel(1);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleThemeChange = (newTheme: 'light' | 'dark') => {
     setTheme(newTheme);
@@ -152,6 +197,9 @@ function App() {
                     recentFiles={recentFiles}
                     onOpenRecent={openTab}
                     onOpenSettings={() => setIsSettingsOpen(true)}
+                    onZoomIn={handleZoomIn}
+                    onZoomOut={handleZoomOut}
+                    onZoomReset={handleZoomReset}
                 />
             </div>
             
@@ -165,19 +213,21 @@ function App() {
       </div>
 
       <div className="flex-1 overflow-auto bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-200 transition-colors">
-        {activeTab ? (
-           <MarkdownViewer content={activeTab.content} filePath={activeTab.filePath} />
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center text-neutral-500 dark:text-neutral-400 gap-4">
-            <p>Open a markdown file to get started</p>
-            <button 
-              onClick={openFile}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
-            >
-              Open File
-            </button>
-          </div>
-        )}
+        <div style={{ zoom: zoomLevel }}>
+          {activeTab ? (
+             <MarkdownViewer content={activeTab.content} filePath={activeTab.filePath} />
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-neutral-500 dark:text-neutral-400 gap-4" style={{ height: 'calc(100vh - 40px)' }}>
+              <p>Open a markdown file to get started</p>
+              <button 
+                onClick={openFile}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+              >
+                Open File
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />

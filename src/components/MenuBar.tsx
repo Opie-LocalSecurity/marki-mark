@@ -8,9 +8,12 @@ interface MenuBarProps {
     recentFiles: string[];
     onOpenRecent: (path: string) => void;
     onOpenSettings: () => void;
+    onZoomIn: () => void;
+    onZoomOut: () => void;
+    onZoomReset: () => void;
 }
 
-export function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, onOpenSettings }: MenuBarProps) {
+export function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, onOpenSettings, onZoomIn, onZoomOut, onZoomReset }: MenuBarProps) {
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const [showRecent, setShowRecent] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -121,6 +124,55 @@ export function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, on
                             className="w-full text-left px-4 py-2 text-xs text-neutral-600 dark:text-neutral-300 hover:bg-blue-600 hover:text-white transition-colors"
                         >
                             Exit
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* View Menu */}
+            <div className="relative ml-1">
+                <button 
+                    onClick={() => toggleMenu('view')}
+                    onMouseEnter={() => activeMenu && setActiveMenu('view')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
+                        activeMenu === 'view' 
+                            ? 'bg-neutral-200 dark:bg-white/10 text-neutral-900 dark:text-white' 
+                            : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white'
+                    }`}
+                >
+                    View
+                </button>
+
+                {activeMenu === 'view' && (
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-white/10 rounded-md shadow-xl py-1 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
+                        <button 
+                            onClick={() => {
+                                onZoomIn();
+                            }}
+                            className="w-full text-left px-4 py-2 text-xs text-neutral-600 dark:text-neutral-300 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-between group"
+                        >
+                            Zoom In
+                            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 group-hover:text-blue-200">Ctrl +</span>
+                        </button>
+                        <button 
+                            onClick={() => {
+                                onZoomOut();
+                            }}
+                            className="w-full text-left px-4 py-2 text-xs text-neutral-600 dark:text-neutral-300 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-between group"
+                        >
+                            Zoom Out
+                            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 group-hover:text-blue-200">Ctrl -</span>
+                        </button>
+                        <div className="h-px bg-neutral-200 dark:bg-white/10 my-1 mx-2" />
+                        <button 
+                            onClick={() => {
+                                onZoomReset();
+                                setActiveMenu(null);
+                            }}
+                            className="w-full text-left px-4 py-2 text-xs text-neutral-600 dark:text-neutral-300 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-between group"
+                        >
+                            Reset Zoom
+                            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 group-hover:text-blue-200">Ctrl 0</span>
                         </button>
                     </div>
                 )}
