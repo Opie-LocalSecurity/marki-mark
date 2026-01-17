@@ -1,16 +1,94 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from '@tauri-apps/plugin-dialog';
-import { FileText } from "lucide-react";
-import { MarkdownViewerMemo as MarkdownViewer } from "./components/MarkdownViewer";
 import { MenuBar } from "./components/MenuBar";
+import { MarkdownViewerMemo as MarkdownViewer } from "./components/MarkdownViewer";
 import { AboutModal } from "./components/AboutModal";
+import { SettingsModal } from "./components/SettingsModal";
 import { TabBar, Tab } from "./components/TabBar";
 
 function App() {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [recentFiles, setRecentFiles] = useState<string[]>([]);
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+
+  // Load theme from localStorage
+  useState(() => {
+    const savedTheme = localStorage.getItem("theme") as 'light' | 'dark' | null;
+    if (savedTheme) {
+        setTheme(savedTheme);
+        if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    } else {
+        // Default to dark
+        document.documentElement.classList.add('dark');
+    }
+  });
+
+  const handleThemeChange = (newTheme: 'light' | 'dark') => {
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    if (newTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+  };
+
+  // Load recent files from localStorage on mount
+  useState(() => {
+    const saved = localStorage.getItem("recentFiles");
+    if (saved) {
+      try {
+        setRecentFiles(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse recent files", e);
+      }
+    }
+  });
+
+  const addToRecentFiles = (path: string) => {
+    setRecentFiles(prev => {
+      const filtered = prev.filter(p => p !== path);
+      const newRecent = [path, ...filtered].slice(0, 10);
+      localStorage.setItem("recentFiles", JSON.stringify(newRecent));
+      return newRecent;
+    });
+  };
+
+  const openTab = async (path: string) => {
+    // Check if already open
+    const existingTab = tabs.find(t => t.filePath === path);
+    if (existingTab) {
+        setActiveTabId(existingTab.id);
+        addToRecentFiles(path); // Update recency even if already open
+        return;
+    }
+
+    try {
+        const text = await invoke<string>("read_file_content", { filePath: path });
+        const fileName = path.split(/[\\/]/).pop() || "Untitled";
+        
+        const newTab: Tab = {
+            id: path,
+            filePath: path,
+            content: text,
+            fileName: fileName
+        };
+
+        setTabs(prev => [...prev, newTab]);
+        setActiveTabId(newTab.id);
+        addToRecentFiles(path);
+    } catch (e) {
+        console.error("Failed to open file:", e);
+    }
+  };
 
   async function openFile() {
     try {
@@ -24,27 +102,8 @@ function App() {
       
       if (selected) {
         const paths = Array.isArray(selected) ? selected : [selected];
-        
         for (const path of paths) {
-          // Check if already open
-          const existingTab = tabs.find(t => t.filePath === path);
-          if (existingTab) {
-            setActiveTabId(existingTab.id);
-            continue;
-          }
-
-          const text = await invoke<string>("read_file_content", { filePath: path });
-          const fileName = path.split(/[\\/]/).pop() || "Untitled";
-          
-          const newTab: Tab = {
-            id: path, // using path as ID for simplicity
-            filePath: path,
-            content: text,
-            fileName: fileName
-          };
-
-          setTabs(prev => [...prev, newTab]);
-          setActiveTabId(newTab.id);
+          await openTab(path);
         }
       }
     } catch (err) {
@@ -52,33 +111,47 @@ function App() {
     }
   }
 
-  const handleTabClose = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newTabs = tabs.filter(t => t.id !== id);
+  const handleTabClose = (tabId: string) => {
+    const tabIndex = tabs.findIndex(t => t.id === tabId);
+    if (tabIndex === -1) return;
+
+    const newTabs = tabs.filter(t => t.id !== tabId);
     setTabs(newTabs);
-    
-    if (activeTabId === id) {
-      const index = tabs.findIndex(t => t.id === id);
-      // Try to select the previous tab, or the next one if it was first
-      const nextTab = newTabs[index - 1] || newTabs[index] || newTabs[0];
-      setActiveTabId(nextTab ? nextTab.id : null);
+
+    if (activeTabId === tabId) {
+        if (newTabs.length > 0) {
+            // Activate previous tab, or next if first
+            const newIndex = tabIndex > 0 ? tabIndex - 1 : 0;
+            setActiveTabId(newTabs[newIndex].id);
+        } else {
+            setActiveTabId(null);
+        }
     }
   };
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
   return (
-    <div className="h-screen flex flex-col bg-background text-foreground selection:bg-blue-500/30">
-        <header className="flex flex-col border-b border-white/10 bg-black/20 backdrop-blur-sm sticky top-0 z-50 select-none">
-            <div className="h-10 flex items-center px-2">
-                <div className="flex items-center gap-2 mr-4 text-blue-400">
-                    <FileText className="w-4 h-4" />
-                    <h1 className="text-xs font-bold tracking-wide">MARKI MARK</h1>
-                </div>
+    <div className="h-screen flex flex-col bg-white dark:bg-neutral-950 transition-colors">
+      <div 
+        data-tauri-drag-region 
+        className="h-10 flex items-center justify-between px-4 bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-200 dark:border-white/10 select-none transition-colors"
+      >
+        <div className="flex items-center gap-4 h-full">
+            <div className="font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                <span className="text-blue-600">Marki</span>Mark
+            </div>
+            
+            <div className="h-4 w-px bg-neutral-300 dark:bg-white/10" />
+            
+            <div className="h-full">
                 
                 <MenuBar 
                     onOpenFile={openFile} 
-                    onOpenAbout={() => setIsAboutOpen(true)} 
+                    onOpenAbout={() => setIsAboutOpen(true)}
+                    recentFiles={recentFiles}
+                    onOpenRecent={openTab}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
                 />
             </div>
             
@@ -88,31 +161,32 @@ function App() {
                 onTabClick={setActiveTabId}
                 onTabClose={handleTabClose}
             />
-        </header>
+        </div>
+      </div>
 
-        <main className="flex-1 overflow-auto bg-neutral-950">
-            {activeTab ? (
-                <MarkdownViewer content={activeTab.content} filePath={activeTab.filePath} />
-            ) : (
-                <div className="h-full flex flex-col items-center justify-center text-neutral-500 gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center">
-                        <FileText className="w-8 h-8 opacity-20" />
-                    </div>
-                    <p className="text-sm">Open a markdown file to get started</p>
-                    <button 
-                        onClick={openFile}
-                        className="text-xs text-blue-400 hover:text-blue-300 hover:underline"
-                    >
-                        Open File...
-                    </button>
-                </div>
-            )}
-        </main>
+      <div className="flex-1 overflow-auto bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-200 transition-colors">
+        {activeTab ? (
+           <MarkdownViewer content={activeTab.content} filePath={activeTab.filePath} />
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-neutral-500 dark:text-neutral-400 gap-4">
+            <p>Open a markdown file to get started</p>
+            <button 
+              onClick={openFile}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+            >
+              Open File
+            </button>
+          </div>
+        )}
+      </div>
 
-        <AboutModal 
-            isOpen={isAboutOpen} 
-            onClose={() => setIsAboutOpen(false)} 
-        />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        theme={theme}
+        onThemeChange={handleThemeChange}
+      />
     </div>
   );
 }

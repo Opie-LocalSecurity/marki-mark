@@ -11,12 +11,12 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
             <div 
-                className="w-80 bg-neutral-900 border border-white/10 rounded-lg shadow-2xl p-6 relative"
+                className="w-80 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-white/10 rounded-lg shadow-2xl p-6 relative transition-colors"
                 onClick={e => e.stopPropagation()}
             >
                 <button 
                     onClick={onClose}
-                    className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+                    className="absolute top-4 right-4 text-neutral-500 dark:text-white/40 hover:text-neutral-900 dark:hover:text-white transition-colors"
                 >
                     <X className="w-4 h-4" />
                 </button>
@@ -28,15 +28,15 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
                     </div>
                     
                     <div>
-                        <h2 className="text-xl font-bold text-white">Marki Mark</h2>
-                        <p className="text-sm text-blue-400">v0.1.0</p>
+                        <h2 className="text-xl font-bold text-neutral-900 dark:text-white">Marki Mark</h2>
+                        <p className="text-sm text-blue-500 dark:text-blue-400">v0.1.0</p>
                     </div>
 
-                    <p className="text-xs text-neutral-400 leading-relaxed">
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
                         A fast, modern, and cross-platform Markdown viewer and editor built with Tauri and React.
                     </p>
 
-                    <p className="text-[10px] text-neutral-600 mt-4">
+                    <p className="text-[10px] text-neutral-400 dark:text-neutral-600 mt-4">
                         © 2026 AntiGravity. All rights reserved.
                     </p>
                 </div>
