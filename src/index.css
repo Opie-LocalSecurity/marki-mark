@@ -24,3 +24,24 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  [data-tauri-drag-region],
+  .no-print {
+    display: none !important;
+  }
+  
+  body, 
+  .flex-1,
+  div {
+    overflow: visible !important;
+    height: auto !important;
+    background: white !important;
+    color: black !important;
+  }
+  
+  .prose {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}
