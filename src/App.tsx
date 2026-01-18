@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from '@tauri-apps/plugin-dialog';
 import { MenuBar } from "./components/MenuBar";
-import { MarkdownViewerMemo as MarkdownViewer } from "./components/MarkdownViewer";
+import { MarkdownViewer } from "./components/MarkdownViewer";
 import { AboutModal } from "./components/AboutModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { TabBar, Tab } from "./components/TabBar";
+import { MarkdownEditor } from "./components/MarkdownEditor";
 
 function App() {
   const [tabs, setTabs] = useState<Tab[]>([]);
@@ -32,37 +33,12 @@ function App() {
     }
   });
 
-  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 3.0));
-  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
-  const handleZoomReset = () => setZoomLevel(1);
+  const handleZoomIn = useCallback(() => setZoomLevel(prev => Math.min(prev + 0.1, 3.0)), []);
+  const handleZoomOut = useCallback(() => setZoomLevel(prev => Math.max(prev - 0.1, 0.5)), []);
+  const handleZoomReset = useCallback(() => setZoomLevel(1), []);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === '=' || e.key === '+') {
-          e.preventDefault();
-          setZoomLevel(prev => Math.min(prev + 0.1, 3.0));
-        } else if (e.key === '-') {
-          e.preventDefault();
-          setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
-        } else if (e.key === '0') {
-          e.preventDefault();
-          setZoomLevel(1);
-        } else if (e.key === 'o' || e.key === 'O') {
-          e.preventDefault();
-          openFile();
-        } else if (e.key === 'p' || e.key === 'P') {
-          e.preventDefault();
-          window.print();
-        }
-      }
-    };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const handleThemeChange = (newTheme: 'light' | 'dark') => {
+  const handleThemeChange = useCallback((newTheme: 'light' | 'dark') => {
     setTheme(newTheme);
     localStorage.setItem("theme", newTheme);
     if (newTheme === 'dark') {
@@ -70,7 +46,7 @@ function App() {
     } else {
       document.documentElement.classList.remove('dark');
     }
-  };
+  }, []);
 
   // Load recent files from localStorage on mount
   useState(() => {
@@ -84,21 +60,32 @@ function App() {
     }
   });
 
-  const addToRecentFiles = (path: string) => {
+  const addToRecentFiles = useCallback((path: string) => {
     setRecentFiles(prev => {
       const filtered = prev.filter(p => p !== path);
       const newRecent = [path, ...filtered].slice(0, 10);
       localStorage.setItem("recentFiles", JSON.stringify(newRecent));
       return newRecent;
     });
-  };
+  }, []);
 
-  const openTab = async (path: string) => {
+  const openTab = useCallback(async (path: string) => {
     // Check if already open
+    setTabs(prevTabs => {
+      const existingTab = prevTabs.find(t => t.filePath === path);
+      if (existingTab) {
+        setActiveTabId(existingTab.id);
+        addToRecentFiles(path);
+        return prevTabs;
+      }
+      return prevTabs; // Will handle in async effect if not found, but we need to call invoke
+    });
+
+    // Need to handle the find separately because setTabs is async
     const existingTab = tabs.find(t => t.filePath === path);
     if (existingTab) {
       setActiveTabId(existingTab.id);
-      addToRecentFiles(path); // Update recency even if already open
+      addToRecentFiles(path);
       return;
     }
 
@@ -119,9 +106,9 @@ function App() {
     } catch (e) {
       console.error("Failed to open file:", e);
     }
-  };
+  }, [tabs, addToRecentFiles]); // Important: tabs dependency to check existing
 
-  async function openFile() {
+  const openFile = useCallback(async () => {
     try {
       const selected = await open({
         multiple: true,
@@ -140,27 +127,86 @@ function App() {
     } catch (err) {
       console.error(err);
     }
-  }
+  }, [openTab]);
 
-  const handleTabClose = (tabId: string) => {
-    const tabIndex = tabs.findIndex(t => t.id === tabId);
-    if (tabIndex === -1) return;
+  const handleTabClose = useCallback((tabId: string) => {
+    setTabs(prev => {
+      const tabIndex = prev.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) return prev;
 
-    const newTabs = tabs.filter(t => t.id !== tabId);
-    setTabs(newTabs);
+      const newTabs = prev.filter(t => t.id !== tabId);
 
-    if (activeTabId === tabId) {
-      if (newTabs.length > 0) {
-        // Activate previous tab, or next if first
-        const newIndex = tabIndex > 0 ? tabIndex - 1 : 0;
-        setActiveTabId(newTabs[newIndex].id);
-      } else {
-        setActiveTabId(null);
+      if (activeTabId === tabId) {
+        if (newTabs.length > 0) {
+          const newIndex = tabIndex > 0 ? tabIndex - 1 : 0;
+          setActiveTabId(newTabs[newIndex].id);
+        } else {
+          setActiveTabId(null);
+        }
       }
-    }
-  };
+      return newTabs;
+    });
+  }, [activeTabId]);
 
-  const activeTab = tabs.find(t => t.id === activeTabId);
+  const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId), [tabs, activeTabId]);
+
+  const toggleEditMode = useCallback(() => {
+    if (!activeTabId) return;
+    setTabs(prev => prev.map(t =>
+      t.id === activeTabId ? { ...t, isEditing: !t.isEditing } : t
+    ));
+  }, [activeTabId]);
+
+
+  const handleSave = useCallback(async (newContent?: string) => {
+    if (!activeTab) return;
+    const contentToSave = newContent !== undefined ? newContent : activeTab.content;
+
+    try {
+      await invoke("write_file_content", {
+        filePath: activeTab.filePath,
+        content: contentToSave
+      });
+
+      // Update the tab content in state
+      setTabs(prev => prev.map(t =>
+        t.id === activeTab.id ? { ...t, content: contentToSave } : t
+      ));
+
+      // Switch back to view mode after save
+      if (activeTab.isEditing) {
+        toggleEditMode();
+      }
+    } catch (e) {
+      console.error("Failed to save file:", e);
+    }
+  }, [activeTab, toggleEditMode]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '=' || e.key === '+') {
+          e.preventDefault();
+          setZoomLevel(prev => Math.min(prev + 0.1, 3.0));
+        } else if (e.key === '-') {
+          e.preventDefault();
+          setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
+        } else if (e.key === 'o' || e.key === 'O') {
+          e.preventDefault();
+          openFile();
+        } else if (e.key === 'p' || e.key === 'P') {
+          e.preventDefault();
+          window.print();
+        } else if (e.key === 'e' || e.key === 'E') {
+          e.preventDefault();
+          toggleEditMode();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [openFile, toggleEditMode, handleSave]);
 
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-neutral-950 transition-colors">
@@ -187,6 +233,8 @@ function App() {
               onZoomOut={handleZoomOut}
               onZoomReset={handleZoomReset}
               onPrint={() => window.print()}
+              isEditing={!!activeTab?.isEditing}
+              onToggleEdit={toggleEditMode}
             />
           </div>
 
@@ -200,9 +248,17 @@ function App() {
       </div>
 
       <div className="flex-1 overflow-auto bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-200 transition-colors">
-        <div style={{ zoom: zoomLevel }}>
+        <div style={{ zoom: zoomLevel }} className="h-full">
           {activeTab ? (
-            <MarkdownViewer content={activeTab.content} filePath={activeTab.filePath} />
+            activeTab.isEditing ? (
+              <MarkdownEditor
+                content={activeTab.content}
+                onSave={handleSave}
+                onCancel={toggleEditMode}
+              />
+            ) : (
+              <MarkdownViewer content={activeTab.content} filePath={activeTab.filePath} />
+            )
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-neutral-500 dark:text-neutral-400 gap-4" style={{ height: 'calc(100vh - 40px)' }}>
               <p>Open a markdown file to get started</p>

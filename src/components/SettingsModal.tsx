@@ -1,3 +1,4 @@
+import React from 'react';
 import { X, Moon, Sun } from "lucide-react";
 
 interface SettingsModalProps {
@@ -7,18 +8,18 @@ interface SettingsModalProps {
     onThemeChange: (theme: 'light' | 'dark') => void;
 }
 
-export function SettingsModal({ isOpen, onClose, theme, onThemeChange }: SettingsModalProps) {
+export const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, theme, onThemeChange }: SettingsModalProps) {
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
-            <div 
+            <div
                 className="w-96 bg-neutral-900 border border-white/10 rounded-lg shadow-2xl p-6 relative"
                 onClick={e => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold text-white">Settings</h2>
-                    <button 
+                    <button
                         onClick={onClose}
                         className="text-white/40 hover:text-white transition-colors"
                     >
@@ -29,14 +30,14 @@ export function SettingsModal({ isOpen, onClose, theme, onThemeChange }: Setting
                 <div className="space-y-6">
                     <div>
                         <h3 className="text-sm font-semibold text-neutral-400 mb-3 uppercase tracking-wider">Appearance</h3>
-                        
+
                         <div className="grid grid-cols-2 gap-3">
                             <button
                                 onClick={() => onThemeChange('light')}
                                 className={`
                                     flex flex-col items-center gap-2 p-3 rounded-md border transition-all
-                                    ${theme === 'light' 
-                                        ? 'bg-blue-600/10 border-blue-500 text-blue-400' 
+                                    ${theme === 'light'
+                                        ? 'bg-blue-600/10 border-blue-500 text-blue-400'
                                         : 'bg-white/5 border-transparent text-neutral-400 hover:bg-white/10 hover:text-white'}
                                 `}
                             >
@@ -48,8 +49,8 @@ export function SettingsModal({ isOpen, onClose, theme, onThemeChange }: Setting
                                 onClick={() => onThemeChange('dark')}
                                 className={`
                                     flex flex-col items-center gap-2 p-3 rounded-md border transition-all
-                                    ${theme === 'dark' 
-                                        ? 'bg-blue-600/10 border-blue-500 text-blue-400' 
+                                    ${theme === 'dark'
+                                        ? 'bg-blue-600/10 border-blue-500 text-blue-400'
                                         : 'bg-white/5 border-transparent text-neutral-400 hover:bg-white/10 hover:text-white'}
                                 `}
                             >
@@ -62,4 +63,4 @@ export function SettingsModal({ isOpen, onClose, theme, onThemeChange }: Setting
             </div>
         </div>
     );
-}
+});

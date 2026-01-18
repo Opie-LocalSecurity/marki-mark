@@ -12,6 +12,12 @@ fn read_file_content(file_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn write_file_content(file_path: String, content: String) -> Result<(), String> {
+    println!("Writing file: {}", file_path);
+    std::fs::write(&file_path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn quit_app(app: tauri::AppHandle) {
     for window in app.webview_windows().values() {
         let _ = window.close();
@@ -23,7 +29,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![greet, read_file_content, quit_app])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            read_file_content,
+            write_file_content,
+            quit_app
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

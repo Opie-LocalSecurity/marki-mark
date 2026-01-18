@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronRight } from "lucide-react";
 
@@ -12,9 +12,11 @@ interface MenuBarProps {
     onZoomOut: () => void;
     onZoomReset: () => void;
     onPrint: () => void;
+    isEditing: boolean;
+    onToggleEdit: () => void;
 }
 
-export function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, onOpenSettings, onZoomIn, onZoomOut, onZoomReset, onPrint }: MenuBarProps) {
+export const MenuBar = React.memo(function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, onOpenSettings, onZoomIn, onZoomOut, onZoomReset, onPrint, isEditing, onToggleEdit }: MenuBarProps) {
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const [showRecent, setShowRecent] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -52,8 +54,8 @@ export function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, on
                     onClick={() => toggleMenu('file')}
                     onMouseEnter={() => activeMenu && setActiveMenu('file')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${activeMenu === 'file'
-                            ? 'bg-neutral-200 dark:bg-white/10 text-neutral-900 dark:text-white'
-                            : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white'
+                        ? 'bg-neutral-200 dark:bg-white/10 text-neutral-900 dark:text-white'
+                        : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white'
                         }`}
                 >
                     File
@@ -72,6 +74,7 @@ export function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, on
                             <span className="text-[10px] text-neutral-400 dark:text-neutral-500 group-hover:text-blue-200">Ctrl+O</span>
                         </button>
 
+
                         {/* Recent Files */}
                         <div
                             className="relative"
@@ -81,7 +84,7 @@ export function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, on
                             <button
                                 className="w-full text-left px-4 py-2 text-xs text-neutral-600 dark:text-neutral-300 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-between"
                             >
-                                Open Recent
+                                Open Recent Files
                                 <ChevronRight className="w-3 h-3 text-neutral-400 dark:text-neutral-500" />
                             </button>
 
@@ -140,14 +143,43 @@ export function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, on
                 )}
             </div>
 
+            {/* Edit Menu */}
+            <div className="relative ml-1">
+                <button
+                    onClick={() => toggleMenu('edit')}
+                    onMouseEnter={() => activeMenu && setActiveMenu('edit')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${activeMenu === 'edit'
+                        ? 'bg-neutral-200 dark:bg-white/10 text-neutral-900 dark:text-white'
+                        : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white'
+                        }`}
+                >
+                    Edit
+                </button>
+
+                {activeMenu === 'edit' && (
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-white/10 rounded-md shadow-xl py-1 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
+                        <button
+                            onClick={() => {
+                                onToggleEdit();
+                                setActiveMenu(null);
+                            }}
+                            className="w-full text-left px-4 py-2 text-xs text-neutral-600 dark:text-neutral-300 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-between group"
+                        >
+                            {isEditing ? 'View Mode' : 'Edit Mode'}
+                            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 group-hover:text-blue-200">Ctrl+E</span>
+                        </button>
+                    </div>
+                )}
+            </div>
+
             {/* View Menu */}
             <div className="relative ml-1">
                 <button
                     onClick={() => toggleMenu('view')}
                     onMouseEnter={() => activeMenu && setActiveMenu('view')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${activeMenu === 'view'
-                            ? 'bg-neutral-200 dark:bg-white/10 text-neutral-900 dark:text-white'
-                            : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white'
+                        ? 'bg-neutral-200 dark:bg-white/10 text-neutral-900 dark:text-white'
+                        : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white'
                         }`}
                 >
                     View
@@ -179,10 +211,9 @@ export function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, on
                                 onZoomReset();
                                 setActiveMenu(null);
                             }}
-                            className="w-full text-left px-4 py-2 text-xs text-neutral-600 dark:text-neutral-300 hover:bg-blue-600 hover:text-white transition-colors flex items-center justify-between group"
+                            className="w-full text-left px-4 py-2 text-xs text-neutral-600 dark:text-neutral-300 hover:bg-blue-600 hover:text-white transition-colors"
                         >
                             Reset Zoom
-                            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 group-hover:text-blue-200">Ctrl 0</span>
                         </button>
                     </div>
                 )}
@@ -194,8 +225,8 @@ export function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, on
                     onClick={() => toggleMenu('help')}
                     onMouseEnter={() => activeMenu && setActiveMenu('help')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${activeMenu === 'help'
-                            ? 'bg-neutral-200 dark:bg-white/10 text-neutral-900 dark:text-white'
-                            : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white'
+                        ? 'bg-neutral-200 dark:bg-white/10 text-neutral-900 dark:text-white'
+                        : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white'
                         }`}
                 >
                     Help
@@ -217,4 +248,4 @@ export function MenuBar({ onOpenFile, onOpenAbout, recentFiles, onOpenRecent, on
             </div>
         </div>
     );
-}
+});
