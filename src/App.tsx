@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from '@tauri-apps/plugin-dialog';
 import { MenuBar } from "./components/MenuBar";
@@ -16,49 +16,19 @@ function App() {
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [zoomLevel, setZoomLevel] = useState(1);
+  const isInitializing = useRef(true);
+  const hasRestored = useRef(false);
 
-  // Load theme from localStorage
-  useState(() => {
-    const savedTheme = localStorage.getItem("theme") as 'light' | 'dark' | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-      if (savedTheme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    } else {
-      // Default to dark
-      document.documentElement.classList.add('dark');
-    }
-  });
 
   const handleZoomIn = useCallback(() => setZoomLevel(prev => Math.min(prev + 0.1, 3.0)), []);
   const handleZoomOut = useCallback(() => setZoomLevel(prev => Math.max(prev - 0.1, 0.5)), []);
   const handleZoomReset = useCallback(() => setZoomLevel(1), []);
 
-
   const handleThemeChange = useCallback((newTheme: 'light' | 'dark') => {
     setTheme(newTheme);
     localStorage.setItem("theme", newTheme);
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
   }, []);
-
-  // Load recent files from localStorage on mount
-  useState(() => {
-    const saved = localStorage.getItem("recentFiles");
-    if (saved) {
-      try {
-        setRecentFiles(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse recent files", e);
-      }
-    }
-  });
 
   const addToRecentFiles = useCallback((path: string) => {
     setRecentFiles(prev => {
@@ -70,21 +40,20 @@ function App() {
   }, []);
 
   const openTab = useCallback(async (path: string) => {
-    // Check if already open
-    setTabs(prevTabs => {
-      const existingTab = prevTabs.find(t => t.filePath === path);
+    // We check against the LATEST tabs state using the functional setter
+    let alreadyOpen = false;
+
+    setTabs(prev => {
+      const existingTab = prev.find(t => t.filePath === path);
       if (existingTab) {
+        alreadyOpen = true;
         setActiveTabId(existingTab.id);
-        addToRecentFiles(path);
-        return prevTabs;
+        return prev;
       }
-      return prevTabs; // Will handle in async effect if not found, but we need to call invoke
+      return prev;
     });
 
-    // Need to handle the find separately because setTabs is async
-    const existingTab = tabs.find(t => t.filePath === path);
-    if (existingTab) {
-      setActiveTabId(existingTab.id);
+    if (alreadyOpen) {
       addToRecentFiles(path);
       return;
     }
@@ -106,7 +75,7 @@ function App() {
     } catch (e) {
       console.error("Failed to open file:", e);
     }
-  }, [tabs, addToRecentFiles]); // Important: tabs dependency to check existing
+  }, [addToRecentFiles]);
 
   const openFile = useCallback(async () => {
     try {
@@ -157,7 +126,6 @@ function App() {
     ));
   }, [activeTabId]);
 
-
   const handleSave = useCallback(async (newContent?: string) => {
     if (!activeTab) return;
     const contentToSave = newContent !== undefined ? newContent : activeTab.content;
@@ -168,36 +136,103 @@ function App() {
         content: contentToSave
       });
 
-      // Update the tab content in state
       setTabs(prev => prev.map(t =>
-        t.id === activeTab.id ? { ...t, content: contentToSave } : t
+        t.id === activeTab.id ? { ...t, content: contentToSave, isEditing: false } : t
       ));
-
-      // Switch back to view mode after save
-      if (activeTab.isEditing) {
-        toggleEditMode();
-      }
     } catch (e) {
       console.error("Failed to save file:", e);
     }
-  }, [activeTab, toggleEditMode]);
+  }, [activeTab]);
+
+  // Persist open tabs and activeTabId
+  useEffect(() => {
+    if (isInitializing.current) return;
+    const paths = tabs.map(t => t.filePath);
+    localStorage.setItem("openTabs", JSON.stringify(paths));
+  }, [tabs]);
+
+  useEffect(() => {
+    if (isInitializing.current) return;
+    if (activeTabId) {
+      localStorage.setItem("activeTabId", activeTabId);
+    } else {
+      localStorage.removeItem("activeTabId");
+    }
+  }, [activeTabId]);
+
+  // Load theme, recent files, and open tabs from localStorage on mount
+  useEffect(() => {
+    if (hasRestored.current) return;
+    hasRestored.current = true;
+
+    const savedTheme = localStorage.getItem("theme") as 'light' | 'dark' | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+
+    const savedRecent = localStorage.getItem("recentFiles");
+    if (savedRecent) {
+      try {
+        setRecentFiles(JSON.parse(savedRecent));
+      } catch (e) {
+        console.error("Failed to parse recent files", e);
+      }
+    }
+
+    const savedTabs = localStorage.getItem("openTabs");
+    const savedActiveTabId = localStorage.getItem("activeTabId");
+
+    if (savedTabs) {
+      try {
+        const paths = JSON.parse(savedTabs) as string[];
+        // Deduplicate paths just in case
+        const uniquePaths = Array.from(new Set(paths));
+
+        if (uniquePaths.length > 0) {
+          // Re-open them sequentially
+          (async () => {
+            for (const path of uniquePaths) {
+              await openTab(path);
+            }
+            if (savedActiveTabId) {
+              setActiveTabId(savedActiveTabId);
+            }
+            isInitializing.current = false;
+          })();
+        } else {
+          isInitializing.current = false;
+        }
+      } catch (e) {
+        console.error("Failed to restore session tabs", e);
+        isInitializing.current = false;
+      }
+    } else {
+      isInitializing.current = false;
+    }
+    // We only want this to run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
-        if (e.key === '=' || e.key === '+') {
+        const key = e.key.toLowerCase();
+        if (key === '=' || key === '+') {
           e.preventDefault();
-          setZoomLevel(prev => Math.min(prev + 0.1, 3.0));
-        } else if (e.key === '-') {
+          handleZoomIn();
+        } else if (key === '-') {
           e.preventDefault();
-          setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
-        } else if (e.key === 'o' || e.key === 'O') {
+          handleZoomOut();
+        } else if (key === 'o') {
           e.preventDefault();
           openFile();
-        } else if (e.key === 'p' || e.key === 'P') {
+        } else if (key === 'p') {
           e.preventDefault();
           window.print();
-        } else if (e.key === 'e' || e.key === 'E') {
+        } else if (key === 'e') {
           e.preventDefault();
           toggleEditMode();
         }
@@ -206,7 +241,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [openFile, toggleEditMode, handleSave]);
+  }, [handleZoomIn, handleZoomOut, openFile, toggleEditMode]);
 
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-neutral-950 transition-colors">

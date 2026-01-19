@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronRight } from "lucide-react";
 
@@ -33,18 +33,18 @@ export const MenuBar = React.memo(function MenuBar({ onOpenFile, onOpenAbout, re
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const handleCloseApp = async () => {
+    const handleCloseApp = useCallback(async () => {
         await invoke("quit_app");
-    };
+    }, []);
 
-    const toggleMenu = (menu: string) => {
+    const toggleMenu = useCallback((menu: string) => {
         if (activeMenu === menu) {
             setActiveMenu(null);
             setShowRecent(false);
         } else {
             setActiveMenu(menu);
         }
-    };
+    }, [activeMenu]);
 
     return (
         <div className="flex items-center h-full" ref={menuRef}>

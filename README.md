@@ -1,7 +1,13 @@
-# Tauri + React + Typescript
+# Marki Mark 0.1.0
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+![Marki Mark](app-icon.png)
 
-## Recommended IDE Setup
+A fast, modern, and cross-platform Markdown viewer and editor built with Tauri and React.
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+Built with:
+
+- Rust v1.92.0
+- Tauri v2.9.5
+- Nodejs v24.13.0
+- React v19.2.1
+- TailwindCSS v4.1.18

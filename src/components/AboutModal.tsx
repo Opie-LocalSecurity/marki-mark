@@ -1,5 +1,6 @@
 import React from 'react';
 import { X } from "lucide-react";
+import logo from '../assets/logo.png';
 
 interface AboutModalProps {
     isOpen: boolean;
@@ -23,9 +24,8 @@ export const AboutModal = React.memo(function AboutModal({ isOpen, onClose }: Ab
                 </button>
 
                 <div className="flex flex-col items-center text-center gap-4">
-                    <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20">
-                        {/* Placeholder logo or icon */}
-                        <span className="text-2xl font-bold text-white">M</span>
+                    <div className="w-20 h-20 bg-blue-600/10 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden border border-blue-600/20">
+                        <img src={logo} alt="Marki Mark Logo" className="w-full h-full object-cover" />
                     </div>
 
                     <div>
